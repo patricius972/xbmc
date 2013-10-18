@@ -42,14 +42,6 @@ CDVDVideoCodecA10::CDVDVideoCodecA10()
 	m_hwrender = false;
 	memset(&m_picture, 0, sizeof(m_picture));
 
-	//check libcedarx dll is loaded 
-
-	if( !g_libcedarx.IsLoaded() )
-	{
-		g_libcedarx.EnableDelayedUnload(false);
-		if( !g_libcedarx.Load() )
-			CLog::Log(LOGERROR, "Load codec failed !");
-	}
 
 	m_convert_bitstream = false;
 }
@@ -62,15 +54,9 @@ CDVDVideoCodecA10::~CDVDVideoCodecA10()
 
 bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 {
-	//check dll is load success
 
-	if( !g_libcedarx.IsLoaded() )
-	{
-		CLog::Log(LOGERROR, "Load failed, cannot start the codec!");
-		return false;
-	}
-
-	CLog::Log(LOGDEBUG, "--------------------- CDVDVideoCodecA10: Open, %d------------------------ ", hints.codec);
+	
+	CLog::Log(LOGDEBUG, "--------------------- CDVDVideoCodecA10: Start, %d------------------------ ", hints.codec);
 
 	s32 ret;
 
@@ -283,12 +269,12 @@ void CDVDVideoCodecA10::Dispose()
 	m_yuvdata = NULL;
 	}
 	*/
-	if (m_hcedarv)
+	if (m_hcedarx)
 	{
-		m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_STOP, 0);
-		m_hcedarv->close(m_hcedarv);
-		g_libcedarx.libcedarv_exit(m_hcedarv);
-		m_hcedarv = NULL;
+		//m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_STOP, 0);
+		//m_hcedarv->close(m_hcedarv);
+		g_libcedarx.libcedarx_decoder_close();
+		m_hcedarx = NULL;
 		CLog::Log(LOGDEBUG, "A10: cedar dispose.");
 	}
 

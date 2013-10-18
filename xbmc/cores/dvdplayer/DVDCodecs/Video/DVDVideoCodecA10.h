@@ -27,7 +27,7 @@
 
 extern "C" {
 #include "cores/a10/libcedarx.h"
-#include "cores/a10/DllLibcedarx.h"
+//#include "cores/a10/DllLibcedarx.h"
 };
 
 class CDVDVideoCodecA10 : public CDVDVideoCodec

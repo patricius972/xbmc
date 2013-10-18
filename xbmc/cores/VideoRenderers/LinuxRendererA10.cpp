@@ -49,9 +49,8 @@
 #include "xbmc/Application.h"
 
 #include "cores/a10/libcedarx.h"
-#include "cores/a10/DllLibcedarx.h"
+#include "cores/a10/avheap.h"
 
-extern DllLibA10decoder g_libbdv;
 
 using namespace Shaders;
 
@@ -85,15 +84,7 @@ CLinuxRendererA10::CLinuxRendererA10()
   m_textureCreate = &CLinuxRendererA10::CreateYV12Texture;
   m_textureDelete = &CLinuxRendererA10::DeleteYV12Texture;
 
-  //check libbdv dll is loaded 
-
-  if( !g_libbdv.IsLoaded() )
-  {
-	  g_libbdv.EnableDelayedUnload(false);
-	  if( !g_libbdv.Load() )
-		  CLog::Log(LOGERROR, "Load codec failed !");
-  }
-
+  
 }
 
 CLinuxRendererA10::~CLinuxRendererA10()
@@ -1758,7 +1749,7 @@ void A10VLHide()
 A10VLQueueItem *A10VLPutQueue(A10VLCALLBACK     callback,
                               void             *callbackpriv,
                               void             *pictpriv,
-                              cedarv_picture_t &pict)
+                              cedarx_picture_t &pict)
 {
   A10VLQueueItem *pRet;
 
@@ -1856,8 +1847,8 @@ int A10VLDisplayPicture(cedarx_picture_t &picture,
   frmbuf.interlace       = picture.is_progressive? 0 : 1;
   frmbuf.top_field_first = picture.top_field_first;
   //frmbuf.frame_rate      = picture.frame_rate;
-  frmbuf.addr[0]         = g_libbdv.mem_get_phy_addr((u32)picture.y);
-  frmbuf.addr[1]         = g_libbdv.mem_get_phy_addr((u32)picture.u);
+  frmbuf.addr[0]         = (u32)av_heap_physic_addr((void*)picture.y);
+  frmbuf.addr[1]         = (u32)av_heap_physic_addr((void*)picture.u);
 
   //if (_inited == 0)
   if ((g_srcRect != srcRect) || (g_dstRect != dstRect))

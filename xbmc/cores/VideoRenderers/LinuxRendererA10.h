@@ -35,7 +35,7 @@
 #include "xbmc/cores/dvdplayer/DVDCodecs/Video/DVDVideoCodecA10.h"
 
 extern "C" {
-#include "cores/a10/libcedarv.h"
+#include "cores/a10/libcedarx.h"
 }
 
 class CRenderCapture;
@@ -267,13 +267,13 @@ inline int NP2( unsigned x )
  */
 
 extern "C" {
-#include "cores/a10/libcedarv.h"
-#include "cores/a10/drv_display_sun4i.h"
+#include "cores/a10/libcedarx.h"
+#include "cores/a10/drv_display.h"
 }
 
 #define DISPQS 20
 
-typedef void (*A10VLCALLBACK)(void *callbackpriv, void *pictpriv, cedarv_picture_t &pict); //cleanup function
+typedef void (*A10VLCALLBACK)(void *callbackpriv, void *pictpriv, cedarx_picture_t &pict); //cleanup function
 
 struct A10VLQueueItem
 {
@@ -281,7 +281,7 @@ struct A10VLQueueItem
   A10VLCALLBACK     callback;
   void             *callbackpriv;
   void             *pictpriv;
-  cedarv_picture_t  pict;
+  cedarx_picture_t  pict;
 };
 
 typedef struct
@@ -306,12 +306,12 @@ void A10VLHide();
 A10VLQueueItem *A10VLPutQueue(A10VLCALLBACK     callback,
                               void             *callbackpriv,
                               void             *pictpriv,
-                              cedarv_picture_t &pict);
+                              cedarx_picture_t &pict);
 
 void A10VLFreeQueue();
 
 void A10VLDisplayQueueItem(A10VLQueueItem *pItem, CRect &srcRect, CRect &dstRect);
 
-int  A10VLDisplayPicture(cedarv_picture_t &pict, int refnr, CRect &srcRect, CRect &dstRect);
+int  A10VLDisplayPicture(cedarx_picture_t &pict, int refnr, CRect &srcRect, CRect &dstRect);
 
 #endif
