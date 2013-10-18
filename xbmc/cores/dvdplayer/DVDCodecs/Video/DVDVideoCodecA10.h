@@ -26,8 +26,8 @@
 #include "DVDStreamInfo.h"
 
 extern "C" {
-#include "cores/a10/libcedarv.h"
-#include "cores/a10/DllLibcedarv.h"
+#include "cores/a10/libcedarx.h"
+#include "cores/a10/DllLibcedarx.h"
 };
 
 class CDVDVideoCodecA10 : public CDVDVideoCodec
@@ -136,10 +136,10 @@ private:
   bool m_hwrender;
 
   //decoding
-  cedarv_stream_info_t  m_info;
+  cedarx_info_t  m_info;
   float                 m_aspect;
   CDVDStreamInfo        m_hints;
-  cedarv_decoder_t     *m_hcedarv;
+  cedarx_decoder_t     *m_hcedarx;
   int                   m_hscaler;
   u8                   *m_yuvdata;
   DVDVideoPicture       m_picture;

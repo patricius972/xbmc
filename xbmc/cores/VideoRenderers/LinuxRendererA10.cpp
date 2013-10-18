@@ -48,8 +48,8 @@
 #include "RenderFormats.h"
 #include "xbmc/Application.h"
 
-#include "cores/a10/libcedarv.h"
-#include "cores/a10/DllLibcedarv.h"
+#include "cores/a10/libcedarx.h"
+#include "cores/a10/DllLibcedarx.h"
 
 extern DllLibA10decoder g_libbdv;
 
@@ -1841,7 +1841,7 @@ void A10VLDisplayQueueItem(A10VLQueueItem *pItem, CRect &srcRect, CRect &dstRect
   pthread_mutex_unlock(&g_dispq_mutex);
 }
 
-int A10VLDisplayPicture(cedarv_picture_t &picture,
+int A10VLDisplayPicture(cedarx_picture_t &picture,
                         int               refnr,
                         CRect            &srcRect,
                         CRect            &dstRect)

@@ -30,24 +30,24 @@ bool IsEnableA10Renderer ()
 
 #define _4CC(c1,c2,c3,c4) (((u32)(c4)<<24)|((u32)(c3)<<16)|((u32)(c2)<<8)|(u32)(c1))
 
-static void freecallback(void *callbackpriv, void *pictpriv, cedarv_picture_t &pict)
+static void freecallback(void *callbackpriv, void *pictpriv, cedarx_picture_t &pict)
 {
 	((CDVDVideoCodecA10*)callbackpriv)->FreePicture(pictpriv, pict);
 }
 
 CDVDVideoCodecA10::CDVDVideoCodecA10()
 {
-	m_hcedarv  = NULL;
+	m_hcedarx  = NULL;
 	m_yuvdata  = NULL;
 	m_hwrender = false;
 	memset(&m_picture, 0, sizeof(m_picture));
 
-	//check libbdv dll is loaded 
+	//check libcedarx dll is loaded 
 
-	if( !g_libbdv.IsLoaded() )
+	if( !g_libcedarx.IsLoaded() )
 	{
-		g_libbdv.EnableDelayedUnload(false);
-		if( !g_libbdv.Load() )
+		g_libcedarx.EnableDelayedUnload(false);
+		if( !g_libcedarx.Load() )
 			CLog::Log(LOGERROR, "Load codec failed !");
 	}
 
@@ -64,7 +64,7 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 {
 	//check dll is load success
 
-	if( !g_libbdv.IsLoaded() )
+	if( !g_libcedarx.IsLoaded() )
 	{
 		CLog::Log(LOGERROR, "Load failed, cannot start the codec!");
 		return false;
@@ -84,140 +84,114 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 
 	memset(&m_info, 0, sizeof(m_info));
 
+	m_info.container = CEDARX_CONTAINER_FORMAT_UNKNOW;
 	m_info.frame_duration = 0;
-	m_info.video_width = hints.width;
-	m_info.video_height = hints.height;
-	m_info.aspect_ratio = 1000;
-	m_info.sub_format = CEDARV_SUB_FORMAT_UNKNOW;
-	m_info.container_format = CEDARV_CONTAINER_FORMAT_UNKNOW;
+	m_info.width = hints.width;
+	m_info.height = hints.height;
 	m_info.init_data_len = 0;
 	m_info.init_data = NULL;
-
+	
 	switch(hints.codec) {
-		//TODO: all the mapping ...
 
-		//*CEDARV_STREAM_FORMAT_MPEG2
+		//*CEDARX_STREAM_FORMAT_MPEG2
 	case CODEC_ID_MPEG1VIDEO:
-		m_info.format     = CEDARV_STREAM_FORMAT_MPEG2;
-		m_info.sub_format = CEDARV_MPEG2_SUB_FORMAT_MPEG1;
+		m_info.stream     = CEDARX_STREAM_FORMAT_MPEG2;
 		break;
 	case CODEC_ID_MPEG2VIDEO:
-		m_info.format     = CEDARV_STREAM_FORMAT_MPEG2;
-		m_info.sub_format = CEDARV_MPEG2_SUB_FORMAT_MPEG2;
+		m_info.stream     = CEDARX_STREAM_FORMAT_MPEG2;
 		break;
 
-		//*CEDARV_STREAM_FORMAT_H264
+		//*CEDARX_STREAM_FORMAT_H264
 	case CODEC_ID_H264:
-		m_info.format = CEDARV_STREAM_FORMAT_H264;
-		m_info.init_data_len = hints.extrasize;
-		m_info.init_data = (u8*)hints.extradata;
+		m_info.stream = CEDARX_STREAM_FORMAT_H264;
+		m_info.data_size = hints.extrasize;
+		m_info.data = (u8*)hints.extradata;
 		if(hints.codec_tag==27) //M2TS and TS
-			m_info.container_format = CEDARV_CONTAINER_FORMAT_TS;
-		
-#if 0 
-		//disable it temporary 
-		// valid avcC data (bitstream) always starts with the value 1 (version)
-		if ( *(char*)hints.extradata == 1 )
-		{
-			CLog::Log(LOGDEBUG, "A10: try to enable bitstream convert.");
-
-			m_convert_bitstream = bitstream_convert_init(hints.extradata, hints.extrasize);
-
-			if( m_convert_bitstream )
-			{
-				CLog::Log(LOGDEBUG, "A10: enable bitstream convert.");
-			}
-		}
-#endif 
-
+			m_info.container = CEDARX_CONTAINER_FORMAT_TS;
 		break;
 
-		//*CEDARV_STREAM_FORMAT_MPEG4
+		//*CEDARX_STREAM_FORMAT_MPEG4
 	case CODEC_ID_MPEG4:
-		m_info.format = CEDARV_STREAM_FORMAT_MPEG4;
                 switch(m_hints.codec_tag)
                 {
-                  case _4CC('D','I','V','X'):
-                    m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_DIVX4;
-                    break;
-                  case _4CC('D','X','5','0'):
-                  case _4CC('D','I','V','5'):
-                    m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_DIVX5;
-                    break;
-                  case _4CC('X','V','I','D'):
-                  case _4CC('M','P','4','V'):
-                  case _4CC('P','M','P','4'):
-                  case _4CC('F','M','P','4'):
-                    m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_XVID;
-                    break;
-                  default:
-                    CLog::Log(LOGERROR, "A10: (MPEG4)Codec Tag %d is unknown.\n", m_hints.codec_tag);
-                    return false;
+			case _4CC('m','p','4','v'):
+			case _4CC('M','P','4','V'):
+			case _4CC('m','p','4','s'):
+			case _4CC('M','P','4','S'):
+			case _4CC('p','m','p','4'):
+			case _4CC('P','M','P','4'):
+			case _4CC('f','m','p','4'):
+			case _4CC('F','M','P','4'):
+			case _4CC('x','v','i','d'):
+			case _4CC('X','V','I','D'):
+			case _4CC('X','v','i','D'):
+			case _4CC('X','V','I','X'):
+			case _4CC('x','v','i','x'):
+				m_info.stream = CEDARX_STREAM_FORMAT_XVID;
+				break;
+			case _4CC('d','i','v','x'):
+			case _4CC('D','I','V','X'):
+				m_info.stream = CEDARX_STREAM_FORMAT_DIVX4;
+				break;
+			case _4CC('D','X','5','0'):
+			case _4CC('d','x','5','0'):
+				m_info.stream = CEDARX_STREAM_FORMAT_DIVX5;
+				break;
+			default:
+				CLog::Log(LOGERROR, "A10: (MPEG4)Codec Tag %d is unknown.\n", m_hints.codec_tag);
+				return false;
                 }
 		break;
 
-		//DIVX4
-		//DIVX5
-		//SORENSSON_H263
-		//H263
-		//RMG2
-
-		//VP6
 	case CODEC_ID_VP6F:
-		m_info.format     = CEDARV_STREAM_FORMAT_MPEG4;
-		m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_VP6;
-		m_info.init_data_len = hints.extrasize;
-		m_info.init_data     = (u8*)hints.extradata;
+		m_info.strean     = CEDARX_STREAM_FORMAT_VP6;
+		m_info.data_size = hints.extrasize;
+		m_info.data     = (u8*)hints.extradata;
 		break;
 		//WMV1
 	case CODEC_ID_WMV1:
-		m_info.format     = CEDARV_STREAM_FORMAT_MPEG4;
-		m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_WMV1;
+		m_info.stream     = CEDARX_STREAM_FORMAT_WM2;
 		break;
 		//WMV2
 	case CODEC_ID_WMV2:
-		m_info.format     = CEDARV_STREAM_FORMAT_MPEG4;
-		m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_WMV2;
+		m_info.stream     = CEDARX_STREAM_FORMAT_WMV2;
 		break;
 		//DIVX1
 	case CODEC_ID_MSMPEG4V1:
-		m_info.format     = CEDARV_STREAM_FORMAT_MPEG4;
-		m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_DIVX1;
+		m_info.stream     = CEDARX_STREAM_FORMAT_DIVX1;
 		break;
 		//DIVX2
 	case CODEC_ID_MSMPEG4V2:
-		m_info.format     = CEDARV_STREAM_FORMAT_MPEG4;
-		m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_DIVX2;
+		m_info.stream     = STREAM_FORMAT_DIVX2;
 		break;
 		//DIVX3
 	case CODEC_ID_MSMPEG4V3:
-		m_info.format     = CEDARV_STREAM_FORMAT_MPEG4;
-		m_info.sub_format = CEDARV_MPEG4_SUB_FORMAT_DIVX3;
+		m_info.stream     = STREAM_FORMAT_DIVX3;
 		break;
 
-		//*CEDARV_STREAM_FORMAT_REALVIDEO
+		//*CEDARX_STREAM_FORMAT_REALVIDEO
 	case CODEC_ID_RV10:
 	case CODEC_ID_RV20:
 	case CODEC_ID_RV30:
 	case CODEC_ID_RV40:
-		m_info.format = CEDARV_STREAM_FORMAT_REALVIDEO;
+		m_info.stream = CEDARX_STREAM_FORMAT_REALVIDEO;
 		break;
 
-		//*CEDARV_STREAM_FORMAT_VC1
+		//*CEDARX_STREAM_FORMAT_VC1
 	case CODEC_ID_VC1:
-		m_info.format	  = CEDARV_STREAM_FORMAT_VC1;
+		m_info.stream	  = CEDARX_STREAM_FORMAT_VC1;
 		break;
 
-		//*CEDARV_STREAM_FORMAT_AVS
+		//*CEDARX_STREAM_FORMAT_AVS
 
-		//*CEDARV_STREAM_FORMAT_MJPEG
+		//*CEDARX_STREAM_FORMAT_MJPEG
 	case CODEC_ID_MJPEG:
-		m_info.format = CEDARV_STREAM_FORMAT_MJPEG;
+		m_info.stream = CEDARX_STREAM_FORMAT_MJPEG;
 		break;
 
-		//*CEDARV_STREAM_FORMAT_VP8
+		//*CEDARX_STREAM_FORMAT_VP8
 	case CODEC_ID_VP8:
-		m_info.format = CEDARV_STREAM_FORMAT_VP8;
+		m_info.stream = CEDARX_STREAM_FORMAT_VP8;
 		break;
 
 		//*
@@ -226,31 +200,20 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 		return false;
 	}
 
-	m_hcedarv = g_libbdv.libcedarv_init(&ret);
-	if (ret < 0) {
-		CLog::Log(LOGERROR, "A10: libcedarv_init failed. (%d)\n", ret);
+	
+	/* Open the device */
+	if(libcedarx_decoder_open(&info) < 0) {
+		CLog::Log(LOGERROR, "A10: open dev failed. (%d)\n", ret);
 		return false;
 	}
 
-	ret = m_hcedarv->set_vstream_info(m_hcedarv, &m_info);
-	if (ret < 0) {
-		CLog::Log(LOGERROR, "A10: set_vstream_m_info failed. (%d), id(%d), format(%d)\n", ret, hints.codec, m_info.format);
-		return false;
-	}
+	//ret = m_hcedarv->ioctrl(m_hcedarv, CEDARX_COMMAND_PLAY, 0);
+	//if (ret < 0) {
+	//	CLog::Log(LOGERROR, "A10: CEDARX_COMMAND_PLAY failed. (%d)\n", ret);
+	//	return false;
+	//}
 
-	ret = m_hcedarv->open(m_hcedarv);
-	if(ret < 0) {
-		CLog::Log(LOGERROR, "A10: open failed. (%d)\n", ret);
-		return false;
-	}
-
-	ret = m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_PLAY, 0);
-	if (ret < 0) {
-		CLog::Log(LOGERROR, "A10: CEDARV_COMMAND_PLAY failed. (%d)\n", ret);
-		return false;
-	}
-
-	CLog::Log(LOGDEBUG, "A10: cedar open.");
+	//CLog::Log(LOGDEBUG, "A10: cedar open.");
 
 	int width = 0, height = 0;
 	double refresh =0.0;
@@ -270,35 +233,35 @@ bool CDVDVideoCodecA10::DoOpen()
 {
 	s32 ret;
 
-	m_hcedarv = g_libbdv.libcedarv_init(&ret);
-	if (ret < 0)
-	{
-		CLog::Log(LOGERROR, "A10: libcedarv_init failed. (%d)\n", ret);
-		goto Error;
-	}
+	//m_hcedarv = g_libcedarx.libcedarv_init(&ret);
+	//if (ret < 0)
+	//{
+	//	CLog::Log(LOGERROR, "A10: libcedarv_init failed. (%d)\n", ret);
+	//	goto Error;
+	//}
 
-	ret = m_hcedarv->set_vstream_info(m_hcedarv, &m_info);
-	if (ret < 0)
-	{
-		CLog::Log(LOGERROR, "A10: set_vstream_info failed. (%d)\n", ret);
-		goto Error;
-	}
+	//ret = m_hcedarv->set_vstream_info(m_hcedarv, &m_info);
+	//if (ret < 0)
+	//{
+	//	CLog::Log(LOGERROR, "A10: set_vstream_info failed. (%d)\n", ret);
+	//	goto Error;
+	//}
 
-	ret = m_hcedarv->open(m_hcedarv);
-	if (ret < 0)
-	{
-		CLog::Log(LOGERROR, "A10: open failed. (%d)\n", ret);
-		goto Error;
-	}
+	//ret = m_hcedarv->open(m_hcedarv);
+	//if (ret < 0)
+	//{
+	//	CLog::Log(LOGERROR, "A10: open failed. (%d)\n", ret);
+	//	goto Error;
+	//}
 
-	ret = m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_PLAY, 0);
-	if (ret < 0)
-	{
-		CLog::Log(LOGERROR, "A10: CEDARV_COMMAND_PLAY failed. (%d)\n", ret);
-		goto Error;
-	}
+	//ret = m_hcedarv->ioctrl(m_hcedarv, CEDARX_COMMAND_PLAY, 0);
+	//if (ret < 0)
+	//{
+	//	CLog::Log(LOGERROR, "A10: CEDARX_COMMAND_PLAY failed. (%d)\n", ret);
+	//	goto Error;
+	//}
 
-	CLog::Log(LOGDEBUG, "A10: cedar open.");
+	//CLog::Log(LOGDEBUG, "A10: cedar open.");
 	return true;
 
 Error:
@@ -324,7 +287,7 @@ void CDVDVideoCodecA10::Dispose()
 	{
 		m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_STOP, 0);
 		m_hcedarv->close(m_hcedarv);
-		g_libbdv.libcedarv_exit(m_hcedarv);
+		g_libcedarx.libcedarv_exit(m_hcedarv);
 		m_hcedarv = NULL;
 		CLog::Log(LOGDEBUG, "A10: cedar dispose.");
 	}
@@ -348,8 +311,8 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
 	s32                        ret;
 	u8                        *buf0, *buf1;
 	u32                        bufsize0, bufsize1;
-	cedarv_stream_data_info_t  dinf;
-	cedarv_picture_t           picture;
+	cedarx_stream_data_info_t  dinf;
+	cedarx_picture_t           picture;
 
 	int demuxer_bytes = iSize;
 	uint8_t *demuxer_content = pData;
@@ -358,84 +321,74 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
 	if (!pData)
 		return VC_BUFFER;
 
-	if (!m_hcedarv)
+	if (!m_hcedarx)
 		return VC_ERROR;
 
-	//bitstream support
-#if 0
-	if (m_convert_bitstream)
-	{
-		// convert demuxer packet from bitstream to bytestream (AnnexB)
-		int bytestream_size = 0;
-		uint8_t *bytestream_buff = NULL;
+	//	ret = m_hcedarv->request_write(m_hcedarv, demuxer_bytes, &buf0, &bufsize0, &buf1, &bufsize1);
 
-		bitstream_convert(demuxer_content, demuxer_bytes, &bytestream_buff, &bytestream_size);
-		if (bytestream_buff && (bytestream_size > 0))
-		{
-			bitstream_convered = true;
-			demuxer_bytes = bytestream_size;
-			demuxer_content = bytestream_buff;
-		}
-	}
-#endif
+	//if(ret < 0)
+	//{
+	//	CLog::Log(LOGERROR, "A10: request_write failed.\n");
+	//	return VC_ERROR;
+	//}
+	//if (bufsize1)
+	//{
+	//	memcpy(buf0, demuxer_content, bufsize0);
+	//	memcpy(buf1, demuxer_content+bufsize0, bufsize1);
+	//}
+	//else
+	//{
+	//	memcpy(buf0, demuxer_content, demuxer_bytes);
+	//}
 
-	ret = m_hcedarv->request_write(m_hcedarv, demuxer_bytes, &buf0, &bufsize0, &buf1, &bufsize1);
-
-	if(ret < 0)
-	{
-		CLog::Log(LOGERROR, "A10: request_write failed.\n");
-		return VC_ERROR;
-	}
-	if (bufsize1)
-	{
-		memcpy(buf0, demuxer_content, bufsize0);
-		memcpy(buf1, demuxer_content+bufsize0, bufsize1);
-	}
-	else
-	{
-		memcpy(buf0, demuxer_content, demuxer_bytes);
-	}
-
-	memset(&dinf, 0, sizeof(dinf));
-	dinf.lengh = iSize;
-#ifdef CEDARV_FLAG_DECODE_NO_DELAY
-	dinf.flags = CEDARV_FLAG_FIRST_PART | CEDARV_FLAG_LAST_PART | CEDARV_FLAG_DECODE_NO_DELAY;
+	//memset(&dinf, 0, sizeof(dinf));
+	//dinf.lengh = iSize;
+#ifdef C//EDARV_FLAG_DECODE_NO_DELAY
+	//dinf.flags = CEDARV_FLAG_FIRST_PART | CEDARV_FLAG_LAST_PART | CEDARV_FLAG_DECODE_NO_DELAY;
 #else
-	dinf.flags = CEDARV_FLAG_FIRST_PART | CEDARV_FLAG_LAST_PART;
+	//dinf.flags = CEDARV_FLAG_FIRST_PART | CEDARV_FLAG_LAST_PART;
 #endif
 
-        dinf.pts = llrint(pts);
-        dinf.flags |= CEDARV_FLAG_PTS_VALID;
-	m_hcedarv->update_data(m_hcedarv, &dinf);
+        //dinf.pts = llrint(pts);
+        //dinf.flags |= CEDARV_FLAG_PTS_VALID;
+	//m_hcedarv->update_data(m_hcedarv, &dinf);
 
-	ret = m_hcedarv->decode(m_hcedarv);
+	//ret = m_hcedarv->decode(m_hcedarv);
+
+	//REPLACE By libceardx_add_stream
+	if (libcedarx_decoder_add_stream(demuxer_content, demuxer_ytes, pts, 0.0) < 0)
+		CLog::Log(LOGERROR, "A10: libcedarx_decoder_add_stream failed.\n");
+		return VC_ERROR;
+    
+            libcedarx_decoder_decode_stream(false);
 
 
-	//bitstream support
-	if (bitstream_convered)
-		free(demuxer_content);
+	////bitstream support
+	//if (bitstream_convered)
+	//	free(demuxer_content);
 
-	if (ret > 3 || ret < 0)
-	{
-		CLog::Log(LOGERROR, "A10: decode(%d): %d\n", iSize, ret);
-	}
+	//if (ret > 3 || ret < 0)
+	//{
+	//	CLog::Log(LOGERROR, "A10: decode(%d): %d\n", iSize, ret);
+	//}
 
-	if (ret == 4)
-	{
-		CLog::Log(LOGNOTICE, "A10: Out of decoder frame buffers. Freeing the queue.\n");
-                A10VLFreeQueue();
+	//if (ret == 4)
+	//{
+	//	CLog::Log(LOGNOTICE, "A10: Out of decoder frame buffers. Freeing the queue.\n");
+        //        A10VLFreeQueue();
 
-		m_hcedarv->decode(m_hcedarv);
-	}
+	//	m_hcedarv->decode(m_hcedarv);
+	//}
 
-	ret = m_hcedarv->display_request(m_hcedarv, &picture);
 
-	if (ret > 3 || ret < -1)
-	{
+	
+	//ret = m_hcedarv->display_request(m_hcedarv, &picture);
+	// REPLACE BY request frame
+	picture = libcedarx_decoder_request_frame();
+	if (!picture) {
 		CLog::Log(LOGERROR, "A10: display_request(%d): %d\n", iSize, ret);
 	}
-
-	if (ret == 0)
+	else
 	{
 		float aspect_ratio = m_aspect;
 		m_picture.pts     = pts;
@@ -519,8 +472,8 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
 			m_hcedarv->display_release(m_hcedarv, picture.id);
 		}
 #else
-                //u8 *y_p = (u8 *)g_libbdv.mem_palloc (picture.size_y, 1024);
-                //u8 *u_p = (u8 *)g_libbdv.mem_palloc (picture.size_u, 1024);
+                //u8 *y_p = (u8 *)g_libcedarx.mem_palloc (picture.size_y, 1024);
+                //u8 *u_p = (u8 *)g_libcedarx.mem_palloc (picture.size_u, 1024);
                 //memcpy (y_p, picture.y, picture.size_y);
                 //memcpy (u_p, picture.u, picture.size_u);
 		//m_hcedarv->display_release(m_hcedarv, picture.id);
@@ -546,7 +499,8 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
 void CDVDVideoCodecA10::Reset()
 {
 	CLog::Log(LOGDEBUG, "A10: reset requested");
-	m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_RESET, 0);
+	libcedarx_decoder_reset(void)
+	//m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_RESET, 0);
 }
 
 /*
@@ -572,11 +526,11 @@ const char* CDVDVideoCodecA10::GetName()
 	return "A10";
 }
 
-void CDVDVideoCodecA10::FreePicture(void *pictpriv, cedarv_picture_t &pict)
+void CDVDVideoCodecA10::FreePicture(void *pictpriv, cedarx_picture_t &pict)
 {
-	m_hcedarv->display_release(m_hcedarv, pict.id);
-        //g_libbdv.mem_pfree (pict.y);
-        //g_libbdv.mem_pfree (pict.u);        
+        fbm_free_frame_buffer(pict);
+        //g_libcedarx.mem_pfree (pict.y);
+        //g_libcedarx.mem_pfree (pict.u);        
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
