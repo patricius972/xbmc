@@ -126,7 +126,7 @@ public:
   virtual unsigned GetConvergeCount();
   */
 
-  void FreePicture(void *pictpriv, cedarv_picture_t &pict);
+  void FreePicture(void *pictpriv, cedarx_picture_t &pict);
 
 private:
 
@@ -139,7 +139,7 @@ private:
   cedarx_info_t  m_info;
   float                 m_aspect;
   CDVDStreamInfo        m_hints;
-  cedarx_decoder_t     *m_hcedarx;
+  //cedarx_decoder_t     *m_hcedarx;
   int                   m_hscaler;
   u8                   *m_yuvdata;
   DVDVideoPicture       m_picture;
@@ -166,4 +166,3 @@ protected:
 
 //////////////////////////////////////////////////////////////////////////
 
-static DllLibA10decoder g_libbdv;

@@ -48,9 +48,11 @@
 #include "RenderFormats.h"
 #include "xbmc/Application.h"
 
+extern "C" {
+
 #include "cores/a10/libcedarx.h"
 #include "cores/a10/avheap.h"
-
+}
 
 using namespace Shaders;
 
@@ -1832,6 +1834,13 @@ void A10VLDisplayQueueItem(A10VLQueueItem *pItem, CRect &srcRect, CRect &dstRect
   pthread_mutex_unlock(&g_dispq_mutex);
 }
 
+static u32 mem_get_phy_addr(u32 virtual_addr)
+{
+        return (u32)av_heap_physic_addr((void*)virtual_addr);
+}
+
+
+
 int A10VLDisplayPicture(cedarx_picture_t &picture,
                         int               refnr,
                         CRect            &srcRect,
@@ -1847,8 +1856,8 @@ int A10VLDisplayPicture(cedarx_picture_t &picture,
   frmbuf.interlace       = picture.is_progressive? 0 : 1;
   frmbuf.top_field_first = picture.top_field_first;
   //frmbuf.frame_rate      = picture.frame_rate;
-  frmbuf.addr[0]         = (u32)av_heap_physic_addr((void*)picture.y);
-  frmbuf.addr[1]         = (u32)av_heap_physic_addr((void*)picture.u);
+  frmbuf.addr[0]         = mem_get_phy_addr((u32)picture.y[0]);
+  frmbuf.addr[1]         = mem_get_phy_addr((u32)picture.u[0]);
 
   //if (_inited == 0)
   if ((g_srcRect != srcRect) || (g_dstRect != dstRect))
@@ -1896,7 +1905,7 @@ int A10VLDisplayPicture(cedarx_picture_t &picture,
     float h1 = g_width * h / w;
 
     layera.fb.mode        = DISP_MOD_MB_UV_COMBINED;
-    layera.fb.format      = picture.pixel_format == CEDARV_PIXEL_FORMAT_AW_YUV422 ? DISP_FORMAT_YUV422 : DISP_FORMAT_YUV420;
+    layera.fb.format      = DISP_FORMAT_YUV420;
     layera.fb.br_swap     = 0;
     layera.fb.seq         = DISP_SEQ_UVUV;
     layera.fb.addr[0]     = frmbuf.addr[0];

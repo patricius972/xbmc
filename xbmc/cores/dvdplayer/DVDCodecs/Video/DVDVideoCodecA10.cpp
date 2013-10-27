@@ -37,7 +37,6 @@ static void freecallback(void *callbackpriv, void *pictpriv, cedarx_picture_t &p
 
 CDVDVideoCodecA10::CDVDVideoCodecA10()
 {
-	m_hcedarx  = NULL;
 	m_yuvdata  = NULL;
 	m_hwrender = false;
 	memset(&m_picture, 0, sizeof(m_picture));
@@ -74,8 +73,14 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 	m_info.frame_duration = 0;
 	m_info.width = hints.width;
 	m_info.height = hints.height;
-	m_info.init_data_len = 0;
-	m_info.init_data = NULL;
+	m_info.data_size = 0;
+	m_info.data = NULL;
+	m_info.sys=NULL;
+	m_info.request_buffer = NULL;
+	m_info.update_buffer = NULL;
+	m_info.release_buffer = NULL;
+	m_info.lock_buffer = NULL;
+	m_info.unlock_buffer = NULL;
 	
 	switch(hints.codec) {
 
@@ -94,6 +99,7 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 		m_info.data = (u8*)hints.extradata;
 		if(hints.codec_tag==27) //M2TS and TS
 			m_info.container = CEDARX_CONTAINER_FORMAT_TS;
+		CLog::Log(LOGERROR, "A10: codecid %d is H264.\n", hints.codec);
 		break;
 
 		//*CEDARX_STREAM_FORMAT_MPEG4
@@ -130,13 +136,13 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 		break;
 
 	case CODEC_ID_VP6F:
-		m_info.strean     = CEDARX_STREAM_FORMAT_VP6;
+		m_info.stream     = CEDARX_STREAM_FORMAT_VP6;
 		m_info.data_size = hints.extrasize;
 		m_info.data     = (u8*)hints.extradata;
 		break;
 		//WMV1
 	case CODEC_ID_WMV1:
-		m_info.stream     = CEDARX_STREAM_FORMAT_WM2;
+		m_info.stream     = CEDARX_STREAM_FORMAT_WMV2;
 		break;
 		//WMV2
 	case CODEC_ID_WMV2:
@@ -148,11 +154,11 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 		break;
 		//DIVX2
 	case CODEC_ID_MSMPEG4V2:
-		m_info.stream     = STREAM_FORMAT_DIVX2;
+		m_info.stream     = CEDARX_STREAM_FORMAT_DIVX2;
 		break;
 		//DIVX3
 	case CODEC_ID_MSMPEG4V3:
-		m_info.stream     = STREAM_FORMAT_DIVX3;
+		m_info.stream     = CEDARX_STREAM_FORMAT_DIVX3;
 		break;
 
 		//*CEDARX_STREAM_FORMAT_REALVIDEO
@@ -188,7 +194,7 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 
 	
 	/* Open the device */
-	if(libcedarx_decoder_open(&info) < 0) {
+	if(libcedarx_decoder_open(&m_info) < 0) {
 		CLog::Log(LOGERROR, "A10: open dev failed. (%d)\n", ret);
 		return false;
 	}
@@ -199,7 +205,7 @@ bool CDVDVideoCodecA10::Open(CDVDStreamInfo &hints, CDVDCodecOptions &options)
 	//	return false;
 	//}
 
-	//CLog::Log(LOGDEBUG, "A10: cedar open.");
+	CLog::Log(LOGDEBUG, "A10: cedar open.");
 
 	int width = 0, height = 0;
 	double refresh =0.0;
@@ -247,7 +253,7 @@ bool CDVDVideoCodecA10::DoOpen()
 	//	goto Error;
 	//}
 
-	//CLog::Log(LOGDEBUG, "A10: cedar open.");
+	CLog::Log(LOGDEBUG, "A10: cedar Doopen.");
 	return true;
 
 Error:
@@ -269,14 +275,11 @@ void CDVDVideoCodecA10::Dispose()
 	m_yuvdata = NULL;
 	}
 	*/
-	if (m_hcedarx)
-	{
 		//m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_STOP, 0);
 		//m_hcedarv->close(m_hcedarv);
-		g_libcedarx.libcedarx_decoder_close();
-		m_hcedarx = NULL;
+		libcedarx_decoder_close();
+		//m_hcedarx = NULL;
 		CLog::Log(LOGDEBUG, "A10: cedar dispose.");
-	}
 
 	if (m_convert_bitstream)
 	{
@@ -297,18 +300,17 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
 	s32                        ret;
 	u8                        *buf0, *buf1;
 	u32                        bufsize0, bufsize1;
-	cedarx_stream_data_info_t  dinf;
-	cedarx_picture_t           picture;
+	//cedarx_stream_data_info_t  dinf;
+	cedarx_picture_t*           picture;
 
 	int demuxer_bytes = iSize;
 	uint8_t *demuxer_content = pData;
 	bool bitstream_convered  = false;
 
+	CLog::Log(LOGERROR, "A10: Decode pData %d\n",pData);
 	if (!pData)
 		return VC_BUFFER;
 
-	if (!m_hcedarx)
-		return VC_ERROR;
 
 	//	ret = m_hcedarv->request_write(m_hcedarv, demuxer_bytes, &buf0, &bufsize0, &buf1, &bufsize1);
 
@@ -342,12 +344,19 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
 	//ret = m_hcedarv->decode(m_hcedarv);
 
 	//REPLACE By libceardx_add_stream
-	if (libcedarx_decoder_add_stream(demuxer_content, demuxer_ytes, pts, 0.0) < 0)
-		CLog::Log(LOGERROR, "A10: libcedarx_decoder_add_stream failed.\n");
+	ret=libcedarx_decoder_add_stream(demuxer_content, demuxer_bytes, pts, 0.0);
+	if ( ret< 0)
+	{
+		CLog::Log(LOGERROR, "A10: libcedarx_decoder_add_stream failed. %d\n",ret);
 		return VC_ERROR;
+	}
     
-            libcedarx_decoder_decode_stream(false);
-
+	ret=libcedarx_decoder_decode_stream(false);
+	if ( ret< 0)
+	{
+		CLog::Log(LOGERROR, "A10: libcedarx_decoder_decode_stream failed. %d\n",ret);
+		//return VC_BUFFER; //need more data
+	}
 
 	////bitstream support
 	//if (bitstream_convered)
@@ -370,19 +379,19 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
 	
 	//ret = m_hcedarv->display_request(m_hcedarv, &picture);
 	// REPLACE BY request frame
-	picture = libcedarx_decoder_request_frame();
+	picture = (cedarx_picture_t*)libcedarx_decoder_request_frame();
 	if (!picture) {
-		CLog::Log(LOGERROR, "A10: display_request(%d): %d\n", iSize, ret);
+		CLog::Log(LOGERROR, "A10: display_request(%d): %d\n", iSize, picture);
 	}
 	else
 	{
 		float aspect_ratio = m_aspect;
 		m_picture.pts     = pts;
 		m_picture.dts     = dts;
-		m_picture.iWidth  = picture.display_width;
-		m_picture.iHeight = picture.display_height;
+		m_picture.iWidth  = picture->display_width;
+		m_picture.iHeight = picture->display_height;
 
-		if (picture.is_progressive) m_picture.iFlags &= ~DVP_FLAG_INTERLACED;
+		if (picture->is_progressive) m_picture.iFlags &= ~DVP_FLAG_INTERLACED;
 		else                        m_picture.iFlags |= DVP_FLAG_INTERLACED;
 
 		/* XXX: we suppose the screen has a 1.0 pixel ratio */ // CDVDVideo will compensate it.
@@ -466,7 +475,7 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
                 //picture.y = y_p;
                 //picture.u = u_p; 
 		m_picture.format     = RENDER_FMT_A10BUF;
-		m_picture.a10buffer  = A10VLPutQueue(freecallback, (void*)this, NULL, picture);
+		m_picture.a10buffer  = A10VLPutQueue(freecallback, (void*)this, NULL, *picture);
 		m_picture.iFlags    |= DVP_FLAG_ALLOCATED;
 #endif
 
@@ -485,7 +494,7 @@ int CDVDVideoCodecA10::Decode(BYTE* pData, int iSize, double dts, double pts)
 void CDVDVideoCodecA10::Reset()
 {
 	CLog::Log(LOGDEBUG, "A10: reset requested");
-	libcedarx_decoder_reset(void)
+	libcedarx_decoder_reset();
 	//m_hcedarv->ioctrl(m_hcedarv, CEDARV_COMMAND_RESET, 0);
 }
 
@@ -514,7 +523,7 @@ const char* CDVDVideoCodecA10::GetName()
 
 void CDVDVideoCodecA10::FreePicture(void *pictpriv, cedarx_picture_t &pict)
 {
-        fbm_free_frame_buffer(pict);
+        libcedarx_free_frame(&pict);
         //g_libcedarx.mem_pfree (pict.y);
         //g_libcedarx.mem_pfree (pict.u);        
 }

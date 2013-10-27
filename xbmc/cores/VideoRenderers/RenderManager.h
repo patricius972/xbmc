@@ -31,7 +31,7 @@
 #include "OverlayRenderer.h"
 
 #if defined(__DVDFAB_FUNC_A10CODEC__)
-#include "cores/a10/libcedarv.h"
+#include "cores/a10/libcedarx.h"
 #endif
 
 class CRenderCapture;

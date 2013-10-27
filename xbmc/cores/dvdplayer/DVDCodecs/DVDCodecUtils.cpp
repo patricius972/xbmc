@@ -26,7 +26,7 @@
 #include "DllSwScale.h"
 
 #if defined(__VIDONME_A10CODEC__)
-#include "cores/a10/libcedarv.h"
+#include "cores/a10/libcedarx.h"
 #endif
 
 // allocate a new picture (PIX_FMT_YUV420P)
@@ -165,12 +165,12 @@ bool CDVDCodecUtils::CopyPicture(YV12Image* pImage, DVDVideoPicture *pSrc)
 
 #if defined(__DVDFAB_FUNC_A10CODEC__)
 
-bool CDVDCodecUtils::CopyPicture(YV12Image* pImage, const cedarv_picture_t *pSrc)
+bool CDVDCodecUtils::CopyPicture(YV12Image* pImage, const cedarx_picture_t *pSrc)
 {
   BYTE *d = pImage->plane[0];
-  int y_len = pSrc->size_y;
-  int u_len = pSrc->size_u;
-  int v_len = pSrc->size_v;
+  int y_len = (int)pSrc->size_y;
+  int u_len = (int)pSrc->size_u;
+  int v_len = (int)pSrc->size_v;
 
   int w = pImage->width * pImage->bpp;
   int h = pImage->height;
